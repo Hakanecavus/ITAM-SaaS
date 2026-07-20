@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client-tenant"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("TENANT_DATABASE_URL")
+}
+
+model Asset {
+  id              String               @id @default(cuid())
+  demiRbasNo      String               @unique
+  serialNo        String?
+  categoryId      String
+  category        AssetCategory        @relation(fields: [categoryId], references: [id])
+  brandModel      String
+  status          String
+  locationId      String
+  location        Location             @relation(fields: [locationId], references: [id])
+  assignedUserId  String?
+  assignedUser    User?                @relation(fields: [assignedUserId], references: [id])
+  purchaseDate    DateTime?
+  purchaseCost    Float? // Added: Satın Alma Maliyeti
+  salvageValue    Float? // Added: Hurda Değeri (Phase 5)
+  usefulLifeYears Int? // Added: Faydalı Ömür (Phase 5)
+  warrantyEnd     DateTime?
+  customFields    String? // Added: JSON array/object as string for custom specs
+  notes           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  history         AssetHistory[]
+  maintenance     MaintenanceRecord[] // Added: Bakım kayıtları
+  auditItems      InventoryAuditItem[]
+  tickets         Ticket[] // Added: İlişkili destek talepleri
+  forms           AssetForm[] // Added: Dijital Zimmet Formları
+}
+
+model AssetCategory {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  assets Asset[]
+}
+
+model Location {
+  id       String           @id @default(cuid())
+  name     String
+  parentId String?
+  parent   Location?        @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children Location[]       @relation("LocationHierarchy")
+  assets   Asset[]
+  audits   InventoryAudit[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String // JSON array of strings
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String
+  title              String? // Şirket içi görev/unvan (Örn: Muhasebe Müdürü)
+  canLogin           Boolean             @default(false)
+  roleId             String?
+  role               Role?               @relation(fields: [roleId], references: [id])
+  managedLocationIds String? // JSON array of location IDs for restricted view
+  assets             Asset[]
+  history            AssetHistory[]
+  licenses           LicenseAssignment[]
+  audits             InventoryAudit[]
+  createdTickets     Ticket[]            @relation("CreatedTickets")
+  assignedTickets    Ticket[]            @relation("AssignedTickets")
+  ticketComments     TicketComment[]
+  signedForms        AssetForm[]         @relation("SignedForms")
+  initiatedForms     AssetForm[]         @relation("InitiatedForms")
+  logs               SystemLog[]
+}
+
+model AssetHistory {
+  id          String   @id @default(cuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  actionType  String // "ASSIGN", "RETURN", "STATUS_CHANGE", "RETIRE"
+  notes       String?
+  documentUrl String? // Uploaded PDF/Image URL for signed forms
+  createdAt   DateTime @default(now())
+}
+
+model TenantSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  actionType  String // CREATE, UPDATE, DELETE, LOGIN, EXPORT
+  module      String // USERS, ROLES, SETTINGS, ASSETS vb.
+  description String
+  metadata    String? // JSON text
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+}
+
+// ================= NEW ITAM MODELS =================
+
+model MaintenanceRecord {
+  id          String    @id @default(cuid())
+  assetId     String
+  asset       Asset     @relation(fields: [assetId], references: [id])
+  type        String // "REPAIR", "MAINTENANCE", "UPGRADE"
+  provider    String // Servis firması
+  cost        Float?
+  invoiceNo   String?
+  details     String?
+  documentUrl String? // Fatura / Servis formu vs.
+  startDate   DateTime
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model License {
+  id             String              @id @default(cuid())
+  name           String // Örn: Office 365, Adobe CC
+  key            String? // Lisans anahtarı
+  seats          Int                 @default(1) // Kaç kişilik lisans
+  purchaseCost   Float?
+  purchaseDate   DateTime?
+  expirationDate DateTime?
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  assignments    LicenseAssignment[]
+}
+
+model LicenseAssignment {
+  id         String   @id @default(cuid())
+  licenseId  String
+  license    License  @relation(fields: [licenseId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  assignedAt DateTime @default(now())
+}
+
+model Consumable {
+  id          String              @id @default(cuid())
+  name        String // Örn: HP Toner 85A
+  category    String // Örn: Toner, Kablo, Klavye
+  quantity    Int                 @default(0)
+  minQuantity Int                 @default(0) // Minimum stok uyarısı
+  cost        Float?
+  notes       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  history     ConsumableHistory[]
+}
+
+model ConsumableHistory {
+  id           String     @id @default(cuid())
+  consumableId String
+  consumable   Consumable @relation(fields: [consumableId], references: [id])
+  actionType   String // "ADD", "REMOVE"
+  quantity     Int
+  userId       String? // Kime verildi
+  notes        String?
+  createdAt    DateTime   @default(now())
+}
+
+model InventoryAudit {
+  id            String               @id @default(cuid())
+  locationId    String
+  location      Location             @relation(fields: [locationId], references: [id])
+  userId        String
+  user          User                 @relation(fields: [userId], references: [id])
+  status        String // "IN_PROGRESS", "COMPLETED"
+  totalExpected Int                  @default(0)
+  totalFound    Int                  @default(0)
+  totalMissing  Int                  @default(0)
+  totalWrongLoc Int                  @default(0)
+  totalUnknown  Int                  @default(0)
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  items         InventoryAuditItem[]
+}
+
+model InventoryAuditItem {
+  id          String         @id @default(cuid())
+  auditId     String
+  audit       InventoryAudit @relation(fields: [auditId], references: [id])
+  assetId     String? // Bilinmeyen cihazlar için null olabilir
+  asset       Asset?         @relation(fields: [assetId], references: [id])
+  scannedCode String // Okutulan barkod/demirbaş no
+  status      String // "FOUND", "MISSING", "WRONG_LOCATION", "UNKNOWN"
+  scannedAt   DateTime?
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String // Kimin bildirimi olduğu (Sistem yöneticisi ise birden fazla kişiye aynı anda gönderilebilir)
+  title     String
+  message   String
+  type      String // "WARNING", "INFO", "SUCCESS", "ERROR"
+  link      String? // Bildirime tıklandığında gidilecek URL
+  isRead    Boolean   @default(false)
+  emailSent Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+}
+
+// ================= PHASE 5 TICKETING MODELS =================
+
+model Ticket {
+  id           String          @id @default(cuid())
+  title        String
+  description  String
+  status       String // "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"
+  priority     String // "LOW", "MEDIUM", "HIGH", "URGENT"
+  assetId      String?
+  asset        Asset?          @relation(fields: [assetId], references: [id])
+  createdById  String
+  createdBy    User            @relation("CreatedTickets", fields: [createdById], references: [id])
+  assignedToId String?
+  assignedTo   User?           @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  comments     TicketComment[]
+}
+
+model TicketComment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  content    String
+  isInternal Boolean  @default(false) // IT personelinin kendi aralarında yazdığı not mu?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ================= PHASE 6 ZİMMET FORMLARI VE E-İMZA =================
+
+model AssetForm {
+  id              String    @id @default(cuid())
+  assetId         String
+  asset           Asset     @relation(fields: [assetId], references: [id])
+  userId          String // Zimmetlenecek veya iade edecek kullanıcı
+  user            User      @relation("SignedForms", fields: [userId], references: [id])
+  assignedById    String? // Formu oluşturan IT personeli
+  assignedBy      User?     @relation("InitiatedForms", fields: [assignedById], references: [id])
+  type            String // "ASSIGN" (Teslim) veya "RETURN" (İade)
+  status          String // "PENDING" (Bekliyor), "SIGNED" (İmzalandı), "REJECTED" (Reddedildi)
+  documentContent String // Sözleşme metni (HTML veya Text formatında saklanır)
+  signatureData   String? // Base64 formatında PNG/SVG imzası
+  signedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}

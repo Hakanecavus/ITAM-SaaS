@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client-master"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("MASTER_DATABASE_URL")
+}
+
+model Tenant {
+  id                   String    @id @default(cuid())
+  name                 String
+  subdomain            String    @unique
+  dbName               String    @unique
+  planName             String    @default("FREE")
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  subscriptionStatus   String    @default("TRIALING") // TRIALING, ACTIVE, PAST_DUE, CANCELED
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  users                User[]
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  password           String
+  mustChangePassword Boolean  @default(false)
+  name               String?
+  tenantId           String?
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

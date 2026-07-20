@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-primary: var(--primary);
+  --color-card-bg: var(--card-bg);
+  --color-badge-success: var(--badge-success);
+  --color-badge-error: var(--badge-error);
+  --color-badge-info: var(--badge-info);
+  --color-badge-warning: var(--badge-warning);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --animate-shimmer: shimmer 1.5s infinite;
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 }
 
+:root {
+  /* Light Theme */
+  --background: #f1f5f9; /* Soft grey */
+  --foreground: #0f172a; /* Dark anthracite */
+  --card-bg: #ffffff; /* Pure white */
+  
+  /* Shared Primary */
+  --primary: #ef4444; /* Vibrant Red */
+  
+  /* Badges (Light mode needs slightly more contrast, but Tailwind defaults are usually fine if paired with dark text) */
+  --badge-success: #22c55e;
+  --badge-error: #ef4444;
+  --badge-info: #3b82f6;
+  --badge-warning: #f97316;
+}
+
+.dark {
+  /* Dark Theme */
+  --background: #09090b; /* Matte dark neutral */
+  --foreground: #f8fafc; /* White text */
+  --card-bg: #18181b; /* Anthracite/Dark grey */
+  
+  --primary: #ef4444; /* Stays the same */
+  
+  --badge-success: #16a34a;
+  --badge-error: #dc2626;
+  --badge-info: #2563eb;
+  --badge-warning: #ea580c;
+}
+
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  @apply transition-colors duration-300 min-h-screen;
+}
+
+@media print {
+  /* Prevent background colors from being stripped */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* BARCODE LABEL PRINT MODE */
+  body.print-mode-label > *:not(.print-only-container) {
+    display: none !important;
+  }
+
+  /* Reset body and page settings for labels */
+  html.print-mode-label, body.print-mode-label {
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 50mm !important;
+    height: 25mm !important;
+    min-height: 0 !important;
+    max-height: 25mm !important;
+    overflow: hidden !important;
+  }
+
+  body.print-mode-label .print-only {
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 50mm !important;
+    height: 24.9mm !important;
+    margin: 0 !important;
+    padding: 1mm !important;
+    box-sizing: border-box !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    background-color: white !important;
+    z-index: 999999 !important;
+    overflow: hidden !important;
+  }
+  
+  /* Show only the label */
+  body.print-mode-label .print-only, body.print-mode-label .print-only * {
+    visibility: visible !important;
+  }
+}
+
+/* Remove page margins in browser print settings if possible for label mode */
+@page {
+  size: auto; /* Fallback for normal printing */
+}
+@page :first {
+  /* Some hacks for page size don't work conditionally well in CSS, but the layout overrides will handle it */
 }
